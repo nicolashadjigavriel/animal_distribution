@@ -1,5 +1,11 @@
 # -*- coding: utf-8 -*-
 """
+Created on Tue Nov 26 15:47:02 2024
+
+@author: nicol
+"""
+# -*- coding: utf-8 -*-
+"""
 Created on Tue Nov 26 11:28:05 2024
 
 @author: User
@@ -52,7 +58,7 @@ def survival_probability(K, daily_intake):
 scale_factor = 0.1
 
 # Load and process data
-animal_data_file = "pantheria_filtered_data_for_distirbution_plots.csv"
+animal_data_file = "pantheria_filtered_data_for_dist_plots.csv"
 animal_data = pd.read_csv(animal_data_file)
 
 land_values_lowres_df = pd.read_csv('land_cru.csv', header=None)
@@ -93,6 +99,7 @@ M = mass*0.001
 latitude = filtered_animal_data["26-4_GR_MRLat_dd"]
 longitude = filtered_animal_data["26-7_GR_MRLong_dd"]
 R_o = filtered_animal_data["18-1_BasalMetRate_mLO2hr"]
+
 
 
 # # Extract required animal data columns
@@ -168,7 +175,7 @@ for t in range(simulation_time_steps):
         individual['survival_probability'] = survival_probability_value
 
         # Save survival probability in the matrix
-        survival_prob_distribution[x, y] += survival_probability_value
+        #survival_prob_distribution[x, y] += survival_probability_value
 
         # Default new_x and new_y to the current position
         new_x, new_y = x, y
@@ -227,10 +234,10 @@ for t in range(simulation_time_steps):
         biomass_density[new_x, new_y] += biomass
         population_density[new_x, new_y] += 1
         
-    for i in range(grid_size_lon):
-        for j in range(grid_size_lat):
-            if population_density[i, j] > 0:
-                survival_prob_distribution[i, j] /= population_density[i, j]
+    # for i in range(grid_size_lon):
+    #     for j in range(grid_size_lat):
+    #         if population_density[i, j] > 0:
+    #             survival_prob_distribution[i, j] /= population_density[i, j]
 
 
     # Update the population with surviving individuals and new offspring
@@ -257,7 +264,7 @@ for t in range(simulation_time_steps):
     biomass_density_plot[biomass_density==0] =np.nan
     
 plt.figure(figsize=(18, 7))
-plt.subplot(1, 4, 1)
+plt.subplot(1, 3, 1)
 plt.imshow(np.transpose(land), cmap='cividis')
 plt.imshow(np.transpose(np.log10(biomass_density_plot)), cmap='inferno')
 plt.colorbar(label='Biomass Density')
@@ -267,7 +274,7 @@ plt.title("Biomass Density")
 
 resources_plot =  NPP*1
 resources_plot[land==0] =np.nan
-plt.subplot(1, 4, 2)
+plt.subplot(1, 3, 2)
 plt.imshow(np.transpose(resources_plot), cmap='inferno')
 plt.colorbar(label='Resources')
 plt.title("Resources")
@@ -280,25 +287,17 @@ plt.title("Resources")
 population_density_plot =  population_density*1
 population_density_plot[population_density==0] =np.nan
 
-plt.subplot(1, 4, 3)
+plt.subplot(1, 3, 3)
 plt.imshow(np.transpose(land), cmap='cividis')
 plt.imshow(np.transpose(np.log10(population_density_plot)), cmap='inferno')#, vmin= 0, vmax=200)
 plt.colorbar(label='Population')
 plt.title("Population")
 
-# Plot Survival Probability Distribution
-survival_prob_plot = survival_prob_distribution 
-np.maximum(population_density, 1)
-survival_prob_plot[population_density == 0] = np.nan
-# Normalize by population density
-plt.subplot(1, 4, 4)
-plt.imshow(np.transpose(land), cmap='cividis')
-plt.imshow(np.transpose(survival_prob_plot),cmap='inferno', vmin= 0, vmax=1)
-plt.colorbar(label='Survival Probability')
-plt.title("Survival Probability Distribution")
-
 plt.tight_layout()
 plt.show()
+
+
+
 
 # Load animal distribution data
 animal_distribution_df = pd.read_csv('actual_animal_density_distribution.csv')
@@ -307,7 +306,11 @@ animal_distribution_df = pd.read_csv('actual_animal_density_distribution.csv')
 animal_distribution_df = animal_distribution_df.dropna(subset=['Lat', 'Lon', 'Biomass_density'])
 
 
-# Prepare an empty grid for biomass density
+# Define the grid resolution (36x72)
+lat = np.linspace(-90, 90, 36)  # Latitude grid (36 points)
+lon = np.linspace(-180, 180, 72)  # Longitude grid (72 points)
+
+# Initialize the heatmap grid
 heatmap = np.zeros((len(lat), len(lon)), dtype=np.float32)
 
 # Map biomass density to grid cells
@@ -315,28 +318,22 @@ for _, row in animal_distribution_df.iterrows():
     lat_val = row['Lat']
     lon_val = row['Lon']
     actual_biomass_density = row['Biomass_density']
-    
-    # Find the closest grid indices
+
+    # Ensure data aligns within the grid boundaries
+    if lat_val < lat.min() or lat_val > lat.max() or lon_val < lon.min() or lon_val > lon.max():
+        continue
+
+    # Find the closest grid indices for latitude and longitude
     lat_idx = (np.abs(lat - lat_val)).argmin()
     lon_idx = (np.abs(lon - lon_val)).argmin()
-    
+
     # Accumulate biomass density into the grid cell
-    if 0 <= lat_idx < heatmap.shape[0] and 0 <= lon_idx < heatmap.shape[1]:
-        heatmap[lat_idx, lon_idx] += actual_biomass_density
+    heatmap[lat_idx, lon_idx] += actual_biomass_density
 
-
+# Mask cells with zero biomass density for better visualization
 heatmap[heatmap == 0] = np.nan
 
-
-# cbar = plt.colorbar()
-# cbar.set_label('Herbivore biomass (kg/km²)')
-# cbar.ax.set_yticklabels([10, 100, 1000, 10000])  # Adjust ticks for clarity
-# plt.title('Grid-Cell-Based Heatmap of Biomass Density')
-# plt.xlabel('Longitude')
-# plt.ylabel('Latitude')
-# plt.show()
-
-
+# Define a custom colormap
 colors = [
     (0.0, "blue"),    # Close to 0
     (0.1, "green"),   # Around 10
@@ -346,18 +343,35 @@ colors = [
 ]
 custom_cmap = LinearSegmentedColormap.from_list("custom_cmap", colors)
 
-# Plot the heatmap with the custom colormap
+# Plot the corrected heatmap
 plt.figure(figsize=(10, 8))
 plt.imshow(
     heatmap,
     origin='lower',
     cmap=custom_cmap,  # Use the custom colormap
     norm=LogNorm(vmin=1, vmax=10000),  # Logarithmic normalization
-    extent=[lon.min(), lon.max(), lat.min(), lat.max()]
+    extent=[lon.min(), lon.max(), lat.min(), lat.max()]  # Ensure correct geographic scaling
 )
 cbar = plt.colorbar()
 cbar.set_label('Herbivore biomass (kg/km²)')
-plt.title('Grid-Cell-Based Heatmap of Biomass Density')
+plt.title('Grid-Cell-Based Heatmap of Biomass Density (36x72 Resolution)')
+plt.xlabel('Longitude')
+plt.ylabel('Latitude')
+plt.show()
+
+
+# Plot the corrected heatmap
+plt.figure(figsize=(10, 8))
+plt.imshow(
+    np.rot90(biomass_density_plot),
+    origin='lower',
+    cmap=custom_cmap,  # Use the custom colormap
+    norm=LogNorm(vmin=1, vmax=10000),  # Logarithmic normalization
+    extent=[lon.min(), lon.max(), lat.min(), lat.max()]  # Ensure correct geographic scaling
+)
+cbar = plt.colorbar()
+cbar.set_label('Modeled biomass (kg/km²)')
+plt.title('Grid-Cell-Based Heatmap of Biomass Density (36x72 Resolution)')
 plt.xlabel('Longitude')
 plt.ylabel('Latitude')
 plt.show()
